@@ -25,7 +25,7 @@ from requests import HTTPError
 
 from mycroft.api import Api
 from mycroft.messagebus.message import Message
-from mycroft.skills.core import MycroftSkill
+from mycroft.skills.core import FallbackSkill
 from mycroft.util.log import getLogger
 from mycroft.util.parse import normalize
 
@@ -82,12 +82,12 @@ class WAApi(Api):
         return wolframalpha.Result(StringIO(data.content))
 
 
-class WolframAlphaSkill(MycroftSkill):
+class WolframAlphaSkill(FallbackSkill):
     PIDS = ['Value', 'NotableFacts:PeopleData', 'BasicInformation:PeopleData',
             'Definition', 'DecimalApproximation']
 
     def __init__(self):
-        MycroftSkill.__init__(self, name="WolframAlphaSkill")
+        FallbackSkill.__init__(self, name="WolframAlphaSkill")
         self.__init_client()
         self.question_parser = EnglishQuestionParser()
 
@@ -100,7 +100,7 @@ class WolframAlphaSkill(MycroftSkill):
 
     def initialize(self):
         self.init_dialog(dirname(__file__))
-        self.emitter.on('intent_failure', self.handle_fallback)
+        self.register_fallback(self.handle_fallback, 10)
 
     def get_result(self, res):
         try:
@@ -149,7 +149,7 @@ class WolframAlphaSkill(MycroftSkill):
 
             # TODO: Log missed intent
             LOG.debug("Unknown intent: " + utterance)
-            return
+            return False
 
         try:
             self.enclosure.mouth_think()
@@ -160,11 +160,10 @@ class WolframAlphaSkill(MycroftSkill):
         except HTTPError as e:
             if e.response.status_code == 401:
                 self.emitter.emit(Message("mycroft.not.paired"))
-            return
+            return True
         except Exception as e:
             LOG.exception(e)
-            self.speak_dialog("not.understood", data={'phrase': phrase})
-            return
+            return False
 
         if result:
             input_interpretation = self.__find_pod_id(res.pods, 'Input')
@@ -185,13 +184,15 @@ class WolframAlphaSkill(MycroftSkill):
             response = "%s %s %s" % (input_interpretation, verb, result)
 
             self.speak(response)
+            return True
         else:
             if len(others) > 0:
                 self.speak_dialog('others.found',
                                   data={'utterance': utterance,
                                         'alternative': others[0]})
+                return True
             else:
-                self.speak_dialog("not.understood", data={'phrase': phrase})
+                return False
 
     @staticmethod
     def __find_pod_id(pods, pod_id):
@@ -240,7 +241,7 @@ class WolframAlphaSkill(MycroftSkill):
         return text
 
     def shutdown(self):
-        self.emitter.remove('intent_failure', self.handle_fallback)
+        self.remove_fallback(self.handle_fallback)
         super(WolframAlphaSkill, self).shutdown()
 
     def stop(self):
