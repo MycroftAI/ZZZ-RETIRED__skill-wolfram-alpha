@@ -47,6 +47,10 @@ class EnglishQuestionParser(object):
                 "(?P<Query1>.*) (?P<QuestionVerb>is|are|was|were) "
                 "(?P<Query2>.*)"),
             re.compile(
+                ".*(?P<QuestionWord>how) "
+                "(?P<Query1>.*) (?P<QuestionVerb>is|are|was|were) "
+                "(?P<Query>.*)"),
+            re.compile(
                 ".*(?P<QuestionWord>who|what|when|where|why|which|how) "
                 "(?P<QuestionVerb>\w+) (?P<Query>.*)")
         ]
@@ -137,10 +141,11 @@ class WolframAlphaSkill(MycroftSkill):
             utt_word = parsed_question.get('QuestionWord')
             utt_verb = parsed_question.get('QuestionVerb')
             utt_query = parsed_question.get('Query')
+            utt_query1 = parsed_question.get('Query1', '')
             if utt_verb == "'s":
                 utt_verb = 'is'
                 parsed_question['QuestionVerb'] = 'is'
-            query = "%s %s %s" % (utt_word, utt_verb, utt_query)
+            query = "%s %s %s %s" % (utt_word, utt_query1, utt_verb, utt_query)
             phrase = "know %s %s %s" % (utt_word, utt_query, utt_verb)
             LOG.debug("Falling back to WolframAlpha: " + query)
         else:
